@@ -19,7 +19,7 @@ spec:
         name: ecloud-exporter
         ports:
         - containerPort: 9199
-          name: metrcis
+          name: metrics
           protocol: TCP
         args:
         - "${AccessKey}"
@@ -32,7 +32,7 @@ spec:
         readinessProbe:
           tcpSocket:
             port: 9199
-          initialDelaySeconds: 30
+          initialDelaySeconds: 15
           periodSeconds: 10
         livenessProbe:
           tcpSocket:
@@ -49,9 +49,9 @@ metadata:
     app.kubernetes.io/name: ecloud-exporter
 spec:
   ports:
-  - name: metrcis
+  - name: metrics
     port: 9199
-    targetPort: metrcis
+    targetPort: metrics
   selector:
     app.kubernetes.io/name: ecloud-exporter
 ---
@@ -63,10 +63,10 @@ metadata:
 spec:
   namespaceSelector:
     matchNames:
-    - alertmanager
+    - monitoring
   endpoints:
   - interval: 60s
-    port: metrcis
+    port: metrics
   jobLabel: app.kubernetes.io/name
   selector:
     matchLabels:
