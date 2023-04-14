@@ -1,64 +1,77 @@
-# ecloud_exporter
-通过api导出账号下各类资源的监控数据.
-
-prometheus端点: `http://${IP}:9199/metrics`.
+# ecloud_exporter V0.2.0
+移动云云监控数据导出
 ## 使用方法
 ### 直接运行ecloud_exporter.py
-```
-python ecloud_exporter.py "AccessKey" "Secretkey" "Pool-Id1:productType1" "Pool-Id2:productType2" ...
-```
-其中AccessKey、Secretkey通过移动云控制台"AccessKey管理"获取, "Pool-Id1:productType1"表示资源池ID:产品类型.
+注意：需使用python3
 
-资源池Pool-Id: <https://ecloud.10086.cn/op-help-center/doc/article/47731>, 全局类产品统一使用CIDC-RP-25.
+安装必要依赖：
+```shell
+pip config set global.index-url https://ecloud.10086.cn/api/query/developer/nexus/repository/python-sdk/simple
+pip install ecloudsdkmonitor==1.0.5
+pip install flask
+```
+```
+python ecloud_exporter.py -h
+usage: ecloud_exporter.py [-h] [-l LISTENPORT]
 
-产品类型表: <https://ecloud.10086.cn/op-help-center/doc/article/47792>
+Prometheus Exporter for China Mobile Cloud. Please run this script with python3.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -l LISTENPORT, --listenport LISTENPORT
+                        Port which the exporter listening on (default: 9199)
+```
+例如：
+```
+python ecloud_exporter.py -l 9199
+```
 ### docker运行
 ```
-docker run -dP -e TZ=Asia/Shanghai zhangrongjie/ecloud_exporter:v0.1.0-beta1 AccessKey Secretkey Pool-Id1:productType1 Pool-Id2:productType2 ...
+docker run -dP -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:v0.2.0
 ```
 ### kubernetes运行
 修改install_in_kubernetes.yaml文件中的参数
 ```
 kubectl apply -f install_in_kubernetes.yaml
 ```
-## 移动云api python sdk的一些问题
-下载地址: <https://ecloud.10086.cn/op-help-center/doc/article/24286>
-### bug1-代码错误
-EcloudRequest.py第17行
-```python
-    def __int__(self, method_type, server_path):
+## Prometheus Configuration
+exporter采用multi-target模式（类似blackbox exporter），示例配置如下：
+```yaml
+  - job_name: ecloud
+    metrics_path: /probe
+    scrape_interval: 1m
+    scrape_timeout: 20s
+    file_sd_configs:
+    - refresh_interval: 1m
+      files:
+      - ecloud_targets.yaml
+    relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_product_type
+    - source_labels: [access_key]
+      target_label: __param_access_key
+    - source_labels: [access_secret]
+      target_label: __param_access_secret
+    - source_labels: [pool_id]
+      target_label: __param_pool_id
+    - regex: access_key|access_secret
+      action: labeldrop
+    - target_label: __address__
+      replacement: localhost:9199  # The Ecloud exporter's real hostname:port.
 ```
-需修改为
-```python
-    def __init__(self, method_type, server_path):
+ecloud_targets.yaml示例如下：
+```yaml
+- targets:
+  - mysql # 需要监控的产品类型
+  - ekafka # 需要监控的产品类型
+  labels:
+    access_key: xx # 必填
+    access_secret: xx # 必填
+    pool_id: xx # 必填
+    xx: xx
 ```
-### bug2-api返回内容中的中文显示为乱码
-EcloudClient.py第153行
-```python
-        acs_response = request(method_type, url, headers=headers, json=payload, params=query_string, timeout=self._timeout)
-```
-需修改为
-```python
-        acs_response = request(method_type, url, headers=headers, json=payload, params=query_string, timeout=self._timeout)
-        acs_response.encoding='utf-8'
-```
-**本项目中提供的sdk是修改过的, 如需测试请使用本项目中的sdk**
-### 查询资源列表api偶现返回空值
-### 签名算法
-签名算法中使用了时间参数, 因此运行程序的环境时区必须为Asia/Shanghai, 否则会报错
-```json
-{
-    "errorMessage":"Invalid parameter Timestamp ",
-    "errorCode":"INVALID_PARAMETER",
-    "state":"ERROR",
-    "requestId":"reqId-7a62eb21f2b19621250ca-8749d9a9-9"
-}
-```
-## 后续改进方向
-- python3适配: 目前只支持python2
-- 降低程序复杂度
-- 参数校验
-- 异常处理
-- 多线程处理: 目前大量指标处理慢, 目前为了数据处理方便, 每次请求只获取一个指标点数据，但api是支持一次性获取多个指标数据的.
-- 支持资源类型拓展: 目前只支持了云主机ECS和对象存储onest, 拓展支持只需要拓展程序中的LabelsSet变量即可, 通过该变量指定各资源类型所需指标标签(参考: <https://ecloud.10086.cn/op-help-center/doc/article/53616>, 应选取值不变的字段作为标签). 因此api返回的内容中包含值会变化的字段, 如通过返回字段自动获取标签集, 会导致监控中的数据不连续(因为标签值不断变化).
-- 日志打印
+其中`target`请填写产品类型，默认采集该产品所有资源的数据，产品类型可通过移动云OpenApi获取 https://ecloud.10086.cn/op-oneapi-static/#/platform/52/52?apiId=6989 ，为返回结果中的`productType`字段。
+
+`access_key`、`access_secret`获取方法：https://ecloud.10086.cn/op-help-center/doc/article/49739
+
+`pool_id`获取方法：https://ecloud.10086.cn/op-help-center/doc/article/54462

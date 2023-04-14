@@ -15,17 +15,12 @@ spec:
         app.kubernetes.io/name: ecloud-exporter
     spec:
       containers:
-      - image: zhangrongjie/ecloud_exporter:v0.1.0-beta1
+      - image: registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:v0.2.0
         name: ecloud-exporter
         ports:
         - containerPort: 9199
           name: metrics
           protocol: TCP
-        args:
-        - "${AccessKey}"
-        - "${Secretkey}"
-        - "${Pool-Id1}:${productType1}"
-        - "${Pool-Id2}:${productType2}"
         env:
         - name: TZ
           value: Asia/Shanghai
@@ -54,20 +49,3 @@ spec:
     targetPort: metrics
   selector:
     app.kubernetes.io/name: ecloud-exporter
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: ecloud-exporter
-  namespace: monitoring
-spec:
-  namespaceSelector:
-    matchNames:
-    - monitoring
-  endpoints:
-  - interval: 60s
-    port: metrics
-  jobLabel: app.kubernetes.io/name
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: ecloud-exporter
