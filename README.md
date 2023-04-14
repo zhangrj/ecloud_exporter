@@ -27,7 +27,7 @@ python ecloud_exporter.py -l 9199
 ```
 ### docker运行
 ```
-docker run -dP -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:v0.2.0
+docker run -dP -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.0
 ```
 ### kubernetes运行
 修改install_in_kubernetes.yaml文件中的参数
