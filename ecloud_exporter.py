@@ -33,6 +33,8 @@ class EcloudMonitor(object):
         if self.config.read_timeout is not None:
             _request_timeout[1] = self.config.read_timeout
         此处尝试修改元组元素，会导致报错，因此这两个参数暂时无法指定
+        --------------------------
+        20230417-在与移动云反馈后，此处的问题已经修复，重新安装ecloudsdkcore、ecloudsdkmonitor即可，版本号不变
         """
         connect_config = Config(
             access_key = self.access_key,
