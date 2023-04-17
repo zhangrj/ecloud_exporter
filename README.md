@@ -75,3 +75,8 @@ ecloud_targets.yaml示例如下：
 `access_key`、`access_secret`获取方法：https://ecloud.10086.cn/op-help-center/doc/article/49739
 
 `pool_id`获取方法：https://ecloud.10086.cn/op-help-center/doc/article/54462
+
+## 指标释义
+详见：https://ecloud.10086.cn/op-help-center/doc/article/51690
+
+暂不支持对象存储专属资源池：https://ecloud.10086.cn/op-help-center/doc/article/47731
