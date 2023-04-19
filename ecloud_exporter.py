@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import argparse
+import multiprocessing
 from datetime import datetime, timedelta
 
 from ecloudsdkcore.config.config import Config
@@ -11,122 +12,118 @@ from flask import Flask, make_response, request
 # 创建应用实例
 app = Flask(__name__)
 
-class EcloudMonitor(object):
+
+class EcloudMonitor:
+    def __init__(self):
+        pass
     # 默认响应超时时间为120秒
     # 默认连接超时时间为3秒
-    def __init__(self, access_key, access_secret, pool_id, read_timeout="120", connect_timeout="3"):
-        self.client = None
-        self.access_key = access_key
-        self.access_secret = access_secret
-        self.pool_id = pool_id
-        if read_timeout is not None:
-            self.read_timeout = read_timeout
-        if connect_timeout is not None:
-            self.connect_timeout = connect_timeout
 
-    def create_client(self):
-        """
-        ecloudsdkmonitor-1.0.5.tar.gz client.py 301-305行
-        _request_timeout = ()
-        if self.config.connect_timeout is not None:
-            _request_timeout[0] = self.config.connect_timeout
-        if self.config.read_timeout is not None:
-            _request_timeout[1] = self.config.read_timeout
-        此处尝试修改元组元素，会导致报错，因此这两个参数暂时无法指定
-        --------------------------
-        20230417-在与移动云反馈后，此处的问题已经修复，重新安装ecloudsdkcore、ecloudsdkmonitor即可，版本号不变
-        """
+    @staticmethod
+    def create_client(access_key, access_secret, pool_id, read_timeout=120, connect_timeout=3) -> Client:
         connect_config = Config(
-            access_key = self.access_key,
-            access_secret = self.access_secret,
-            pool_id = self.pool_id,
-            # read_timeout = self.read_timeout,
-            # connect_timeout = self.connect_timeout
+            access_key=access_key,
+            access_secret=access_secret,
+            pool_id=pool_id,
+            read_timeout=read_timeout,
+            connect_timeout=connect_timeout
         )
-        self.client = Client(connect_config)   
+        return Client(connect_config)
 
-    def get_resource(self, product_type):
+    @staticmethod
+    def get_resource(client: Client, product_type) -> list:
         request = ListResourceRequest()
         list_resource_query = ListResourceQuery()
         # 设为较大值，避免结果分页
         list_resource_query.page_size = 100000
         list_resource_query.product_type = product_type
         request.list_resource_query = list_resource_query
-        response =  self.client.list_resource(request)
+        response = client.list_resource(request)
         if response.code == "000000" and response.entity is not None:
-            # list
             return response.entity.content
         else:
-            print("Get {} resource error, response: {}".format(product_type, response))
+            print("Get {} resource error, response: {}".format(
+                product_type, response))
             return []
 
-    def get_metric(self, product_type):
+    @staticmethod
+    def get_metric(client: Client, product_type) -> list:
         request = ListMetricIndicatorRequest()
         list_metric_indicator_query = ListMetricIndicatorQuery()
         list_metric_indicator_query.product_type = product_type
         request.list_metric_indicator_query = list_metric_indicator_query
-        response = self.client.list_metric_indicator(request)
+        response = client.list_metric_indicator(request)
         if response.code == "000000" and response.entity is not None:
-            # list
             return response.entity
         else:
-            print("Get {} metric error, response: {}".format(product_type, response))
+            print("Get {} metric error, response: {}".format(
+                product_type, response))
             return []
 
-    def get_metric_node(self, resource_id, metric_name):
+    @staticmethod
+    def get_metric_node(client: Client, resource_id, metric_name) -> list:
         request = ListMetricNodeRequest()
         list_metric_node_query = ListMetricNodeQuery()
         list_metric_node_query.resource_id = resource_id
         list_metric_node_query.metric_name = metric_name
         request.list_metric_node_query = list_metric_node_query
-        response = self.client.list_metric_node(request)
+        response = client.list_metric_node(request)
         if response.code == "000000" and response.entity is not None:
-            # list
             return response.entity
         else:
-            print("Get resource {} metric node error, response: {}".format(resource_id, response))
+            print("Get resource {} metric node error, response: {}".format(
+                resource_id, response))
             return []
 
-    def get_latest_performance(self, product_type, resource_id):
+    @staticmethod
+    def get_latest_performance(access_key, access_secret, pool_id, product_type, resource_id, resource_name) -> str:
+        client = EcloudMonitor.create_client(
+            access_key, access_secret, pool_id)
         request = FetchPerformanceRequest()
         fetch_performance_body = FetchPerformanceBody()
         metrics = []
-        metric_list = self.get_metric(product_type)
+        metric_list = EcloudMonitor.get_metric(client, product_type)
         if len(metric_list) == 0:
             return []
         else:
             for metric in metric_list:
                 if metric.childnode == True:
-                    metric_node_list = self.get_metric_node(resource_id, metric.metric_name)
+                    metric_node_list = EcloudMonitor.get_metric_node(
+                        client, resource_id, metric.metric_name)
                     for metric_node in metric_node_list:
                         metrics.append(FetchPerformanceRequestMetrics(
-                            metric_name = metric.metric_name,
-                            metric_node_name = metric_node)
+                            metric_name=metric.metric_name,
+                            metric_node_name=metric_node)
                         )
                 else:
                     metrics.append(FetchPerformanceRequestMetrics(
-                        metric_name = metric.metric_name)
+                        metric_name=metric.metric_name)
                     )
             fetch_performance_body.resource_id = resource_id
-            # end_time = datetime.now(pytz.timezone("Asia/Shanghai"))
             end_time = datetime.now()
-            # 移动云云监控取值周期为5min，此处查询范围为6min以确保只得到最新的1个数据点
-            start_time = end_time - timedelta(minutes = 6)
-            fetch_performance_body.start_time = start_time.strftime("%Y-%m-%d %H:%M:%S")
-            fetch_performance_body.end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
+            if product_type == "floatingip" or product_type == "ipv6":
+                # 公网IP数据采集上报有10分钟左右的延迟
+                start_time = end_time - timedelta(minutes=12)
+            else:
+                # 移动云云监控取值周期大部分为5min，此处查询范围为6min以确保可得到最新的1个数据点
+                start_time = end_time - timedelta(minutes=6)
+            fetch_performance_body.start_time = start_time.strftime(
+                "%Y-%m-%d %H:%M:%S")
+            fetch_performance_body.end_time = end_time.strftime(
+                "%Y-%m-%d %H:%M:%S")
             fetch_performance_body.metrics = metrics
             fetch_performance_body.product_type = product_type
             request.fetch_performance_body = fetch_performance_body
-            response = self.client.fetch_performance(request)
+            response = client.fetch_performance(request)
             if response.code == "000000" and response.entity is not None:
-                # list
-                return response.entity
+                return EcloudMonitor.convert_to_prometheus_format(resource_id, resource_name, product_type, response.entity)
             else:
-                print("Get {} resource {} latest performance error, response: {}".format(product_type, resource_id, response))
-                return []
+                print("Get {} resource {} latest performance error, response: {}".format(
+                    product_type, resource_id, response))
+                return ''
 
     @staticmethod
-    def convert_to_prometheus_format(resource_id, resource_name, product_type, performance_list):
+    def convert_to_prometheus_format(resource_id, resource_name, product_type, performance_list) -> str:
         """
         [{'avg_value': 1298.84375,
         'childnode': True,
@@ -158,29 +155,43 @@ class EcloudMonitor(object):
 @app.route("/")
 @app.route("/probe")
 def EcloudCollector():
-    # http://localhost:8000/probe?access_key=xx&access_secret=xx&pool_id=CIDC-RP-31&product_type=mysql
     access_key = request.args.get('access_key')
     access_secret = request.args.get('access_secret')
     pool_id = request.args.get('pool_id')
     product_type = request.args.get('product_type')
-    ecloudmonitor = EcloudMonitor(access_key, access_secret, pool_id)
-    ecloudmonitor.create_client()
-    prometheus_format_content = ''
-    for resource in ecloudmonitor.get_resource(product_type):
-        resource_id = resource.resource_id
+    client = EcloudMonitor.create_client(access_key, access_secret, pool_id)
+    query_pool = multiprocessing.Pool()
+    param_list = []
+    for resource in EcloudMonitor.get_resource(client, product_type):
         resource_name = resource.resource_name
-        performance_list = ecloudmonitor.get_latest_performance(product_type, resource_id)
-        prometheus_format_content += ecloudmonitor.convert_to_prometheus_format(resource_id, resource_name, product_type, performance_list)
+        # 公网IP类型的资源ID使用IP形式，形如： 192-168-1-1
+        # 共享带宽的资源ID需要使用该共享带宽绑定的IP，形如{192-168-1-1,192-168-1-2}，因SDK不返回ipList，暂不支持该产品监控
+        if product_type == 'floatingip':
+            resource_id = resource_name.replace('.', '-')
+        else:
+            resource_id = resource.resource_id
+        param_list.append((access_key, access_secret, pool_id,
+                          product_type, resource_id, resource_name))
+
+    prometheus_format_content_list = query_pool.starmap(
+        EcloudMonitor.get_latest_performance, param_list)
+    query_pool.close()
+    query_pool.join()
+    prometheus_format_content = ''
+    for content in prometheus_format_content_list:
+        prometheus_format_content += content
     response = make_response(prometheus_format_content)
     response.headers["Content-Type"] = "text/plain; charset=utf-8"
     return response
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Prometheus Exporter for China Mobile Cloud. Please run this script with python3.')
-    parser.add_argument('-l', '--listenport', default=9199, help='Port which the exporter listening on (default: %(default)s)')
+    parser = argparse.ArgumentParser(
+        description='Prometheus Exporter for China Mobile Cloud. Please run this script with python3.')
+    parser.add_argument('-l', '--listenport', default=9199,
+                        help='Port which the exporter listening on (default: %(default)s)')
 
     args = parser.parse_args()
     port = args.listenport
 
-    app.run(debug = True, host = '0.0.0.0', port = int(port))
+    app.run(host='0.0.0.0', port=int(port))

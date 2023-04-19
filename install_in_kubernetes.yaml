@@ -15,7 +15,7 @@ spec:
         app.kubernetes.io/name: ecloud-exporter
     spec:
       containers:
-      - image: registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.0
+      - image: registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.1
         name: ecloud-exporter
         ports:
         - containerPort: 9199
