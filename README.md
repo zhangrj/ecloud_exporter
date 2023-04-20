@@ -1,4 +1,4 @@
-# ecloud_exporter V0.2.0
+# ecloud_exporter V0.2.2
 移动云云监控数据导出
 ## 使用方法
 ### 直接运行ecloud_exporter.py
@@ -27,7 +27,7 @@ python ecloud_exporter.py -l 9199
 ```
 ### docker运行
 ```
-docker run -d -p 9199:9199 -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.1
+docker run -d -p 9199:9199 -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.2
 ```
 ### kubernetes运行
 修改install_in_kubernetes.yaml文件中的参数
@@ -84,3 +84,5 @@ ecloud_targets.yaml示例如下：
 暂不支持子节点数据采集，例如负载均衡的监听器，对象存储的存储桶，kafka的消费组，redis集群的redis节点等。
 
 暂不支持共享带宽数据采集，因SDK不返回ipList，无法构造资源ID，共享带宽的资源ID需要使用该共享带宽绑定的IP，形如{192-168-1-1,192-168-1-2}。
+
+数据延迟15分钟以上的暂不采集。

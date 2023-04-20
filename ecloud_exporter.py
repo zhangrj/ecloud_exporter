@@ -2,6 +2,7 @@
 
 import argparse
 import multiprocessing
+import gzip
 from datetime import datetime, timedelta
 
 from ecloudsdkcore.config.config import Config
@@ -101,12 +102,7 @@ class EcloudMonitor:
                     )
             fetch_performance_body.resource_id = resource_id
             end_time = datetime.now()
-            if product_type == "floatingip" or product_type == "ipv6":
-                # 公网IP数据采集上报有10分钟左右的延迟
-                start_time = end_time - timedelta(minutes=12)
-            else:
-                # 移动云云监控取值周期大部分为5min，此处查询范围为6min以确保可得到最新的1个数据点
-                start_time = end_time - timedelta(minutes=6)
+            start_time = end_time - timedelta(minutes=15)
             fetch_performance_body.start_time = start_time.strftime(
                 "%Y-%m-%d %H:%M:%S")
             fetch_performance_body.end_time = end_time.strftime(
@@ -115,6 +111,7 @@ class EcloudMonitor:
             fetch_performance_body.product_type = product_type
             request.fetch_performance_body = fetch_performance_body
             response = client.fetch_performance(request)
+            # 跳过None值，prometheus无法读取
             if response.code == "000000" and response.entity is not None:
                 return EcloudMonitor.convert_to_prometheus_format(resource_id, resource_name, product_type, response.entity)
             else:
@@ -145,10 +142,10 @@ class EcloudMonitor:
         """
         prometheus_format_content = ''
         for performance in performance_list:
-            if performance.childnode == True:
-                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn}, {performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{selected_metric_item="{performance.selected_metric_item}",resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.max_value}\n'
-            elif performance.childnode == False:
-                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn}, {performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.max_value}\n'
+            if performance.childnode == True and performance.avg_value is not None:
+                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn},{performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{selected_metric_item="{performance.selected_metric_item}",resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.avg_value}\n'
+            elif performance.childnode == False and performance.avg_value is not None:
+                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn},{performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.avg_value}\n'
         return prometheus_format_content
 
 
@@ -180,8 +177,9 @@ def EcloudCollector():
     prometheus_format_content = ''
     for content in prometheus_format_content_list:
         prometheus_format_content += content
-    response = make_response(prometheus_format_content)
-    response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    response = make_response(gzip.compress(bytes(prometheus_format_content,'utf-8')))
+    response.headers["Content-Type"] = "text/plain; version=0.0.4; charset=utf-8"
+    response.headers["Content-Encoding"] = "gzip"
     return response
 
 
