@@ -142,10 +142,10 @@ class EcloudMonitor:
         """
         prometheus_format_content = ''
         for performance in performance_list:
-            if performance.childnode == True and performance.avg_value is not None:
-                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn},{performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{selected_metric_item="{performance.selected_metric_item}",resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.avg_value}\n'
-            elif performance.childnode == False and performance.avg_value is not None:
-                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn},{performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.avg_value}\n'
+            if performance.childnode == True and performance.datapoints is not None:
+                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn},{performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{selected_metric_item="{performance.selected_metric_item}",resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.datapoints[-1][0]}\n'
+            elif performance.childnode == False and performance.datapoints is not None:
+                prometheus_format_content += f'# HELP {performance.metric_name} {performance.metric_name_cn},{performance.unit}.\n# TYPE {performance.metric_name} gauge\n{performance.metric_name}{{resource_id="{resource_id}",resource_name="{resource_name}",product_type="{product_type}"}} {performance.datapoints[-1][0]}\n'
         return prometheus_format_content
 
 
