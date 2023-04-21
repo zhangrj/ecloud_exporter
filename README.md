@@ -1,4 +1,4 @@
-# ecloud_exporter V0.2.3
+# ecloud_exporter
 移动云云监控数据导出
 ## 使用方法
 ### 直接运行ecloud_exporter.py
@@ -27,7 +27,7 @@ python ecloud_exporter.py -l 9199
 ```
 ### docker运行
 ```
-docker run -d -p 9199:9199 -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.3
+docker run -d -p 9199:9199 -e TZ=Asia/Shanghai registry.cn-hangzhou.aliyuncs.com/zhangrongjie/ecloud_exporter:0.2.4
 ```
 ### kubernetes运行
 修改install_in_kubernetes.yaml文件中的参数
