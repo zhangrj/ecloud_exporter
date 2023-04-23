@@ -85,7 +85,7 @@ class EcloudMonitor:
         metrics = []
         metric_list = EcloudMonitor.get_metric(client, product_type)
         if len(metric_list) == 0:
-            return []
+            return ''
         else:
             for metric in metric_list:
                 if metric.childnode == True:
