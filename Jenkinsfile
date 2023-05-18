@@ -7,5 +7,11 @@ pipeline {
       }
     }
 
+    stage('deploy') {
+      steps {
+        sh 'docker run -d -p 9199:9199 -e TZ=Asia/Shanghai ecloud_exporter:latest'
+      }
+    }
+
   }
 }
