@@ -3,7 +3,7 @@ pipeline {
   stages {
     stage('build') {
       steps {
-        sh 'docker build . '
+        sh 'docker build -t ecloud_exporter:latest .'
       }
     }
 
